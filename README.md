@@ -9,7 +9,7 @@
 
 锁管理器和远程同步器之间采用异步执行的方式，他们之间的耦合点主要在于共享部分数据。
 
-![设计结构图](./doc/img/redis-lock-struct.png)
+![设计结构图](https://raw.githubusercontent.com/Uetty/online-lock-parent/master/doc/img/redis-lock-struct.png)
 
 本地锁管理器存在两种状态：
 1. 本地锁状态（与本地线程的竞争相关）
