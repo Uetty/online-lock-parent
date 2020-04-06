@@ -6,9 +6,14 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class RemoteSynchronizer {
 
+    public enum Signal {
+        LOCK,
+        UNLOCK,
+        RENEWAL,
+        ;
+    }
 
-
-    abstract void notifySynchronize();
+    public abstract void notifySynchronize(Signal signal);
 
 
 }

@@ -18,7 +18,7 @@ public class DistributedLock {
     private RemoteConfigure configure;
     private volatile RemoteSynchronizer synchronizer;
 
-    private static final long WAIT_TIME_UNIT = 200_000L; // nano second
+    public static final long WAIT_TIME_UNIT = 200_000L; // nano second
     private static final long WAIT_USE_PARK_THRESHOLD = 1500_000_000; // milli second
 
     /**
@@ -28,7 +28,7 @@ public class DistributedLock {
     public DistributedLock(RemoteConfigure remoteConfigure) {
         this.lockPool = new ConcurrentHashMap<>();
         this.configure = remoteConfigure;
-        synchronizer = remoteConfigure.createRemoteSynchronizer();
+        synchronizer = remoteConfigure.createRemoteSynchronizer(lockPool);
     }
 
     /**
@@ -57,7 +57,7 @@ public class DistributedLock {
         Sync sync = lockPool.get(key);
         sync.lock();
 
-        return new Lock(key, sync.getResourceToken());
+        return new Lock(key, sync.getLockToken());
     }
 
     /**
@@ -69,7 +69,7 @@ public class DistributedLock {
         Sync sync = lockPool.get(key);
         boolean isSuccess = sync.tryLock(nanos, waitMillis * 1000_000);
         if (isSuccess) {
-            return new Lock(key, sync.getResourceToken());
+            return new Lock(key, sync.getLockToken());
         } else {
             return null;
         }
@@ -99,53 +99,67 @@ public class DistributedLock {
     public class Sync extends AbstractQueuedSynchronizer {
 
         volatile boolean fair; // 是否公平锁
-        volatile AtomicInteger resourceState;
-        volatile String resourceToken;
+        volatile AtomicInteger lockState; // 分布式锁状态
+        volatile String lockToken; // 分布式锁token
 
         /**
          * 无需进食（没有业务线程等待锁，也没有线程持有锁）
          */
-        private static final int RESOURCE_STATE_NO_MEAL = 0;
+        public static final int LOCK_STATE_NO_MEAL = 0;
         /**
          * 等待投食（业务线程正在等待远程同步器获取锁）
          */
-        private static final int RESOURCE_STATE_WAIT_FEEDING = 1;
+        public static final int LOCK_STATE_WAIT_FEEDING = 1;
+        /**
+         * 取消投食（tryLock时间过期，取消lock）
+         */
+        public static final int LOCK_STATE_CANCEL_FEEDING = 2;
         /**
          * 正在进食（远程同步器已投食，业务线程正在处理）
          */
-        private static final int RESOURCE_STATE_EATING = 2;
+        public static final int LOCK_STATE_EATING = 3;
         /**
-         * 餐后收拾（业务线程在本地释放锁，等待远程同步器清理）
+         * 收拾餐具（业务线程在本地释放锁，等待远程同步器清理）
          */
-        private static final int RESOURCE_STATE_WAIT_CLEAR = 3;
+        public static final int LOCK_STATE_CUTLERY_CLEAN = 4;
 
         private Sync(boolean fair) {
             this.fair = fair;
-            resourceState = new AtomicInteger(0);
+            lockState = new AtomicInteger(0);
         }
 
-        private boolean changeResourceState(int expect, int state) {
-            return resourceState.compareAndSet(expect, state);
+        public int getLockState() {
+            return lockState.get();
+        }
+
+        public boolean changeLockState(int expect, int state) {
+            return lockState.compareAndSet(expect, state);
+        }
+
+        private void setLockStateCancel() {
+            setState(0);
+            lockState.set(LOCK_STATE_CANCEL_FEEDING);
         }
 
         @SuppressWarnings("unused")
-        protected void setResourceToken(String resourceToken) {
-            this.resourceToken = resourceToken;
+        public void setLockToken(String lockToken) {
+            this.lockToken = lockToken;
         }
 
-        protected String getResourceToken() {
-            return this.resourceToken;
+        public String getLockToken() {
+            return this.lockToken;
         }
 
         protected void lock() {
             if (!fair && compareAndSetState(0, 1)) { // 非公平的会进行一次尝试
                 // 切换资源状态
-                while (!changeResourceState(RESOURCE_STATE_NO_MEAL, RESOURCE_STATE_WAIT_FEEDING)) {
+                while (!changeLockState(LOCK_STATE_NO_MEAL, LOCK_STATE_WAIT_FEEDING)) {
                     LockSupport.parkNanos(WAIT_TIME_UNIT);
                 }
                 setExclusiveOwnerThread(Thread.currentThread());
+                sendSignal(RemoteSynchronizer.Signal.LOCK);
 
-                while (resourceState.get() != Sync.RESOURCE_STATE_EATING) {
+                while (lockState.get() != Sync.LOCK_STATE_EATING) {
                     LockSupport.parkNanos(WAIT_TIME_UNIT);
                 }
                 return;
@@ -153,12 +167,16 @@ public class DistributedLock {
             acquire(1);
         }
 
+        public void sendSignal(RemoteSynchronizer.Signal signal) {
+            synchronizer.notifySynchronize(signal);
+        }
+
         protected boolean tryLock(long startNanoSeconds, long waitNanoSeconds) {
 
             while (System.nanoTime() - startNanoSeconds < waitNanoSeconds) {
                 if (compareAndSetState(0, 1)) {
                     // 切换资源状态
-                    while (!changeResourceState(RESOURCE_STATE_NO_MEAL, RESOURCE_STATE_WAIT_FEEDING)) {
+                    while (!changeLockState(LOCK_STATE_NO_MEAL, LOCK_STATE_WAIT_FEEDING)) {
                         long restTime = waitNanoSeconds - (System.currentTimeMillis() - startNanoSeconds);
                         if (restTime > WAIT_USE_PARK_THRESHOLD) {
                             LockSupport.parkNanos(WAIT_TIME_UNIT);
@@ -169,13 +187,19 @@ public class DistributedLock {
                     }
                     setExclusiveOwnerThread(Thread.currentThread());
 
-                    while (resourceState.get() != Sync.RESOURCE_STATE_EATING) {
+                    sendSignal(RemoteSynchronizer.Signal.LOCK);
+
+                    while (lockState.get() != Sync.LOCK_STATE_EATING) {
                         long restTime = waitNanoSeconds - (System.currentTimeMillis() - startNanoSeconds);
                         if (restTime > WAIT_USE_PARK_THRESHOLD) {
                             LockSupport.parkNanos(WAIT_TIME_UNIT);
                         } else if (restTime <= 0) {
                             setExclusiveOwnerThread(null);
-                            compareAndSetState(1, 0);
+
+                            setLockStateCancel();
+
+                            sendSignal(RemoteSynchronizer.Signal.LOCK);
+
                             return false;
                         }
                     }
@@ -198,13 +222,15 @@ public class DistributedLock {
                 if (!hasQueuedPredecessors() && compareAndSetState(c, arg)) {
                     setExclusiveOwnerThread(current);
 
+                    sendSignal(RemoteSynchronizer.Signal.LOCK);
+
                     // 切换资源状态
-                    while (!changeResourceState(RESOURCE_STATE_NO_MEAL, RESOURCE_STATE_WAIT_FEEDING)) {
+                    while (!changeLockState(LOCK_STATE_NO_MEAL, LOCK_STATE_WAIT_FEEDING)) {
                         LockSupport.parkNanos(WAIT_TIME_UNIT);
                     }
                     setExclusiveOwnerThread(Thread.currentThread());
 
-                    while (resourceState.get() != Sync.RESOURCE_STATE_EATING) {
+                    while (lockState.get() != Sync.LOCK_STATE_EATING) {
                         LockSupport.parkNanos(WAIT_TIME_UNIT);
                     }
 
@@ -234,9 +260,12 @@ public class DistributedLock {
             if (c == 0) { // 判断可重入锁，多次加锁后是否释放到0
                 free = true;
                 setExclusiveOwnerThread(null);
-                changeResourceState(RESOURCE_STATE_EATING, RESOURCE_STATE_WAIT_CLEAR);
+                changeLockState(LOCK_STATE_EATING, LOCK_STATE_CUTLERY_CLEAN);
             }
             setState(c);
+
+            sendSignal(RemoteSynchronizer.Signal.UNLOCK);
+
             return free;
         }
     }

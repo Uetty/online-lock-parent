@@ -1,5 +1,6 @@
 package com.uetty.jedis.config;
 
+import com.uetty.jedis.lock.DistributedLock;
 import com.uetty.jedis.remote.RemoteSynchronizer;
 import com.uetty.jedis.remote.SimpleRemoteSynchronizer;
 
@@ -7,14 +8,19 @@ import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocketFactory;
 import java.net.URI;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class SimpleRemoteConfigure extends RemoteConfigure {
+
+    private static final int DEFAULT_RENEWAL_INTERVAL = 6;
+    private static final int DEFAULT_EXPIRE_TIME = 30;
+    private static final int DEFAULT_SERVER_PORT = 6379;
+    private static final int DEFAULT_BATCH_SIZE = 20;
 
     private String keyPrefix;
 
     private String serverHost;
-    private int serverPort;
+    private int serverPort = DEFAULT_SERVER_PORT;
     private int serverDb;
     private boolean useSSL;
     private URI uri;
@@ -22,8 +28,10 @@ public class SimpleRemoteConfigure extends RemoteConfigure {
     private SSLParameters sslParameters;
     private HostnameVerifier hostnameVerifier;
 
-    private int maxThreadSize;
-    private int initThreadSize;
+    private int renewalInterval = DEFAULT_RENEWAL_INTERVAL;
+    private int expireTime = DEFAULT_EXPIRE_TIME;
+
+    private int batchSize = DEFAULT_BATCH_SIZE;
 
     public String getKeyPrefix() {
         return keyPrefix;
@@ -97,24 +105,32 @@ public class SimpleRemoteConfigure extends RemoteConfigure {
         this.hostnameVerifier = hostnameVerifier;
     }
 
-    public int getMaxThreadSize() {
-        return maxThreadSize;
+    public int getRenewalInterval() {
+        return renewalInterval;
     }
 
-    public void setMaxThreadSize(int maxThreadSize) {
-        this.maxThreadSize = maxThreadSize;
+    public void setRenewalInterval(int renewalInterval) {
+        this.renewalInterval = renewalInterval;
     }
 
-    public int getInitThreadSize() {
-        return initThreadSize;
+    public int getExpireTime() {
+        return expireTime;
     }
 
-    public void setInitThreadSize(int initThreadSize) {
-        this.initThreadSize = initThreadSize;
+    public void setExpireTime(int expireTime) {
+        this.expireTime = expireTime;
+    }
+
+    public int getBatchSize() {
+        return batchSize;
+    }
+
+    public void setBatchSize(int batchSize) {
+        this.batchSize = batchSize;
     }
 
     @Override
-    public RemoteSynchronizer createRemoteSynchronizer() {
-        return new SimpleRemoteSynchronizer(this);
+    public RemoteSynchronizer createRemoteSynchronizer(ConcurrentHashMap<String, DistributedLock.Sync> lockPool) {
+        return new SimpleRemoteSynchronizer(this, lockPool);
     }
 }
