@@ -111,7 +111,7 @@ public class DistributedLock {
          */
         public static final int LOCK_STATE_WAIT_FEEDING = 1;
         /**
-         * 取消投食（tryLock时间过期，取消lock）
+         * 取消进食（tryLock时间过期，取消lock）
          */
         public static final int LOCK_STATE_CANCEL_FEEDING = 2;
         /**

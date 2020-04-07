@@ -1,16 +1,11 @@
-package com.uetty.jedis;
+package com.uetty.jedis.test;
 
-import com.uetty.jedis.config.RemoteConfigure;
 import com.uetty.jedis.config.SimpleRemoteConfigure;
 import com.uetty.jedis.lock.DistributedLock;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.LockSupport;
 
-public class App {
+public class OLockTestWithTry1 {
 
     public static void main(String[] args) throws InterruptedException {
         System.out.println("---------------");
@@ -77,8 +72,16 @@ public class App {
         public void run() {
             String threadName = this.getName();
             while (true) {
-                DistributedLock.Lock lock = distributedLock.lock("keyaaa");
-                System.out.println(threadName + " lock 25s keyaaa->" + lock.getToken() + "--> " + (System.currentTimeMillis() / 1000));
+                DistributedLock.Lock lock = distributedLock.tryLock("keyaaa",6000);
+                if (lock == null) {
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    continue;
+                }
+                System.out.println("T3 lock 25s keyaaa->" + lock.getToken() + "--> " + (System.currentTimeMillis() / 1000));
                 try {
                     Thread.sleep(25000);
                 } catch (InterruptedException e) {

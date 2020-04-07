@@ -4,5 +4,6 @@ if (nums == 0) then
 -- 判断未设置成功
     return 0;
 end
+-- 设置成功，要加上自动过期
 redis.call('expire', KEYS[1], ARGV[2]);
 return 1;

@@ -24,7 +24,22 @@ AQS相关的状态，用于AQS锁的竞争
 共有四种状态：
 0. 无需进食（没有业务线程等待锁，也没有线程持有锁）
 1. 等待投食（业务线程正在等待远程同步器获取锁）
-2. 正在进食（远程同步器已投食，业务线程正在处理）
-3. 餐后收拾（业务线程在本地释放锁，等待远程同步器清理）
+2. 取消进食（tryLock时间过期，取消lock）
+3. 正在进食（远程同步器已投食，业务线程正在处理）
+4. 收拾餐具（业务线程在本地释放锁，等待远程同步器清理）
 
+
+## 使用
+SimpleRemoteConfigure是适配单节点redis的远程同步器实现类的配置类
+```
+SimpleRemoteConfigure configure = new SimpleRemoteConfigure();
+configure.setKeyPrefix("lockinst");
+configure.setServerHost("127.0.0.1");
+DistributedLock distributedLock = new DistributedLock(configure);
+try {
+    DistributedLock.Lock lock = distributedLock.lock("lockname");
+} finally {
+    lock.unlock();
+}
+```
 
