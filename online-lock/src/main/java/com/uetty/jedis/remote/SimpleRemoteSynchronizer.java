@@ -5,6 +5,8 @@ import com.uetty.jedis.config.SimpleRemoteConfigure;
 import com.uetty.jedis.lock.DistributedLock;
 import com.uetty.jedis.thread.NamedThreadFactory;
 import com.uetty.jedis.util.UuidUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +16,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
 
 public class SimpleRemoteSynchronizer extends RemoteSynchronizer {
+
+    final static Logger LOG = LoggerFactory.getLogger(DistributedLock.class);
 
     private final ConcurrentMap<String, WorkingNode> lockWorkingNodes = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, WorkingNode> unlockWorkingNodes = new ConcurrentHashMap<>();
@@ -225,7 +229,7 @@ public class SimpleRemoteSynchronizer extends RemoteSynchronizer {
                 try {
                     result = lockServer.execLuas(LuaConfig.LUA_NAME_LOCK, keys, args);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    LOG.error(e.getMessage(), e);
 
                     for (WorkingNode node : workingNodes) {
                         lockWorkingNodes.remove(node.key);
@@ -244,7 +248,7 @@ public class SimpleRemoteSynchronizer extends RemoteSynchronizer {
                     }
                     lockWorkingNodes.remove(node.key);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    LOG.warn(e.getMessage(), e);
                 }
             }
 
@@ -289,7 +293,7 @@ public class SimpleRemoteSynchronizer extends RemoteSynchronizer {
                 try {
                     unlockServer.execLuas(LuaConfig.LUA_NAME_UNLOCK, keys, args);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    LOG.error(e.getMessage(), e);
 
                     for (WorkingNode node : workingNodes) {
                         unlockWorkingNodes.remove(node.key);
@@ -303,7 +307,7 @@ public class SimpleRemoteSynchronizer extends RemoteSynchronizer {
                     node.sync.changeLockState(DistributedLock.Sync.LOCK_STATE_CUTLERY_CLEAN, DistributedLock.Sync.LOCK_STATE_NO_MEAL);
                     unlockWorkingNodes.remove(node.key);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    LOG.warn(e.getMessage(), e);
                 }
             }
         }
@@ -366,7 +370,7 @@ public class SimpleRemoteSynchronizer extends RemoteSynchronizer {
                         }
                     });
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    LOG.error(e.getMessage(), e);
                     return;
                 }
             }

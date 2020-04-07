@@ -7,7 +7,7 @@
     <groupId>org.uetty.jedis</groupId>
     <artifactId>online-lock-parent</artifactId>
     <packaging>pom</packaging>
-    <version>1.0.0</version>
+    <version>1.0.1-Beta</version>
     <modules>
         <module>online-lock</module>
     </modules>

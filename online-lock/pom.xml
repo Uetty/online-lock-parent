@@ -5,7 +5,7 @@
     <parent>
         <artifactId>online-lock-parent</artifactId>
         <groupId>org.uetty.jedis</groupId>
-        <version>1.0.0</version>
+        <version>1.0.1-Beta</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
