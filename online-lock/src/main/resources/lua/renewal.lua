@@ -5,7 +5,7 @@ if (str == nil) then
     return 0;
 else
     if (str == ARGV[1]) then
-        redis.call('del', KEYS[1]);
+        redis.call('expire', KEYS[1], ARGV[2]);
         return 1;
     end
 end

@@ -3,6 +3,7 @@ package com.uetty.jedis.remote;
 import com.uetty.jedis.config.LuaConfig;
 import com.uetty.jedis.config.SimpleRemoteConfigure;
 import com.uetty.jedis.lock.DistributedLock;
+import com.uetty.jedis.thread.NamedThreadFactory;
 import com.uetty.jedis.util.UuidUtil;
 
 import java.util.ArrayList;
@@ -10,6 +11,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.LockSupport;
 
 public class SimpleRemoteSynchronizer extends RemoteSynchronizer {
 
@@ -68,12 +70,12 @@ public class SimpleRemoteSynchronizer extends RemoteSynchronizer {
         batchSize = configure.getBatchSize();
 
         ThreadPoolExecutor.DiscardPolicy discardPolicy = new ThreadPoolExecutor.DiscardPolicy();
-        lockThreadPool = new ThreadPoolExecutor(1, 3,
-                3, TimeUnit.SECONDS, new LinkedBlockingQueue<>(10), discardPolicy);
-        unlockThreadPool = new ThreadPoolExecutor(1, 3,
-                3, TimeUnit.SECONDS, new LinkedBlockingQueue<>(10), discardPolicy);
-        renewalThreadPool = new ThreadPoolExecutor(1, 3,
-                3, TimeUnit.SECONDS, new LinkedBlockingQueue<>(10), discardPolicy);
+        lockThreadPool = new ThreadPoolExecutor(1, 3, 3, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(10), new NamedThreadFactory("olock-" + keyPrefix + "-lock"), discardPolicy);
+        unlockThreadPool = new ThreadPoolExecutor(1, 3, 3, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(10), new NamedThreadFactory("olock-" + keyPrefix + "-unlock"), discardPolicy);
+        renewalThreadPool = new ThreadPoolExecutor(1, 3,3, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(10), new NamedThreadFactory("olock-" + keyPrefix + "-renewal"), discardPolicy);
 
         lockWorker = new LockWorker();
         unlockWorker = new UnlockWorker();
@@ -195,7 +197,7 @@ public class SimpleRemoteSynchronizer extends RemoteSynchronizer {
                     }
                     List<byte[]> key = new ArrayList<>();
                     List<byte[]> arg = new ArrayList<>();
-                    key.add((keyPrefix + node.key).getBytes());
+                    key.add((keyPrefix + ":" + node.key).getBytes());
                     String token = UuidUtil.getUuid() + ":" + serial.incrementAndGet();
                     node.nextToken = token;
                     arg.add(token.getBytes());
@@ -274,6 +276,7 @@ public class SimpleRemoteSynchronizer extends RemoteSynchronizer {
             while (nodes.size() > 0) {
                 batchUnlock(nodes);
             }
+            unlockThreadPool.execute(unlockWorker);
         }
 
         private void batchUnlock(List<WorkingNode> nodes) {
@@ -319,7 +322,7 @@ public class SimpleRemoteSynchronizer extends RemoteSynchronizer {
                         continue;
                     }
                     List<byte[]> key = new ArrayList<>();
-                    key.add((keyPrefix + node.key).getBytes());
+                    key.add((keyPrefix + ":"  + node.key).getBytes());
                     List<byte[]> arg = new ArrayList<>();
                     arg.add(node.sync.getLockToken().getBytes());
                     arg.add(String.valueOf(expireTime).getBytes());
@@ -347,9 +350,10 @@ public class SimpleRemoteSynchronizer extends RemoteSynchronizer {
                 return;
             }
 
-            while (nodes.size() > 0) {
-                batchRenewal(nodes);
-            }
+            batchRenewal(nodes);
+
+            LockSupport.parkNanos(200_000_000);
+            renewalThreadPool.execute(renewalWorker);
         }
 
         private void batchRenewal(List<WorkingNode> nodes) {
@@ -358,7 +362,7 @@ public class SimpleRemoteSynchronizer extends RemoteSynchronizer {
                 try {
                     renewalServer.execByPipeline(pipeline -> {
                         for (WorkingNode node : nodes) {
-                            pipeline.expire(keyPrefix + node.key, expireTime);
+                            pipeline.expire(keyPrefix + ":"  + node.key, expireTime);
                         }
                     });
                 } catch (Exception e) {

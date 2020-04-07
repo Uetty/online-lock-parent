@@ -222,13 +222,13 @@ public class DistributedLock {
                 if (!hasQueuedPredecessors() && compareAndSetState(c, arg)) {
                     setExclusiveOwnerThread(current);
 
-                    sendSignal(RemoteSynchronizer.Signal.LOCK);
-
                     // 切换资源状态
                     while (!changeLockState(LOCK_STATE_NO_MEAL, LOCK_STATE_WAIT_FEEDING)) {
                         LockSupport.parkNanos(WAIT_TIME_UNIT);
                     }
                     setExclusiveOwnerThread(Thread.currentThread());
+
+                    sendSignal(RemoteSynchronizer.Signal.LOCK);
 
                     while (lockState.get() != Sync.LOCK_STATE_EATING) {
                         LockSupport.parkNanos(WAIT_TIME_UNIT);
