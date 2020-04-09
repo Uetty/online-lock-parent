@@ -4,10 +4,32 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>org.uetty.jedis</groupId>
+    <groupId>com.uetty.jedis</groupId>
     <artifactId>online-lock-parent</artifactId>
     <packaging>pom</packaging>
     <version>1.0.1-Beta</version>
+
+    <name>online lock parent</name>
+    <url>https://github.com/Uetty/online-lock-parent</url>
+    <licenses>
+        <license>
+            <name>The Apache Software License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>vincent field</name>
+            <email>vincent_field@foxmail.com</email>
+        </developer>
+    </developers>
+    <scm>
+        <url>https://github.com/Uetty/online-lock-parent</url>
+        <connection>scm:git:git@github.com:Uetty/online-lock-parent.git</connection>
+        <developerConnection>scm:git:git@github.com:Uetty/online-lock-parent.git</developerConnection>
+    </scm>
+
     <modules>
         <module>online-lock</module>
     </modules>
@@ -50,4 +72,82 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>develop</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+        </profile>
+        <profile>
+            <!--打包环境-->
+            <id>release</id>
+            <properties>
+                <profiles.active>release</profiles.active>
+                <!--                <gpg.executable>gpg2</gpg.executable>-->
+            </properties>
+
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.0.0</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.plugins</groupId>
+                        <artifactId>nexus-staging-maven-plugin</artifactId>
+                        <version>1.6.8</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <serverId>ossrh</serverId>
+                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                            <!--                            <autoReleaseAfterClose>true</autoReleaseAfterClose>-->
+                            <!--                            <updateReleaseInfo>true</updateReleaseInfo>-->
+                        </configuration>
+                    </plugin>
+
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-deploy-plugin</artifactId>
+                        <version>2.8.2</version>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>1.6</version>
+                        <executions>
+                            <execution>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+            <!--定义snapshots库和releases库的nexus地址-->
+            <distributionManagement>
+                <snapshotRepository>
+                    <id>ossrh</id>
+                    <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+                </snapshotRepository>
+                <repository>
+                    <id>ossrh</id>
+                    <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+                </repository>
+            </distributionManagement>
+        </profile>
+    </profiles>
 </project>

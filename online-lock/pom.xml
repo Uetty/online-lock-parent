@@ -4,12 +4,33 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
         <artifactId>online-lock-parent</artifactId>
-        <groupId>org.uetty.jedis</groupId>
+        <groupId>com.uetty.jedis</groupId>
         <version>1.0.1-Beta</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>online-lock</artifactId>
+    <name>online lock</name>
+
+    <url>https://github.com/Uetty/online-lock-parent/tree/master/online-lock</url>
+    <licenses>
+        <license>
+            <name>The Apache Software License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>vincent field</name>
+            <email>vincent_field@foxmail.com</email>
+        </developer>
+    </developers>
+    <scm>
+        <url>https://github.com/Uetty/online-lock-parent/tree/master/online-lock</url>
+        <connection>scm:git:git@github.com:Uetty/online-lock-parent.git/online-lock</connection>
+        <developerConnection>scm:git:git@github.com:Uetty/online-lock-parent.git/online-lock</developerConnection>
+    </scm>
 
     <dependencies>
         <dependency>
@@ -17,5 +38,6 @@
             <artifactId>jedis</artifactId>
         </dependency>
     </dependencies>
+
 
 </project>
