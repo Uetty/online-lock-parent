@@ -15,8 +15,7 @@ import java.util.concurrent.locks.LockSupport;
 public class DistributedLock {
 
     private final ConcurrentHashMap<String, Sync> lockPool;
-    private RemoteConfigure configure;
-    private volatile RemoteSynchronizer synchronizer;
+    private volatile RemoteSynchronizer remoteSynchronizer;
 
     public static final long WAIT_TIME_UNIT = 200_000L; // nano second
     private static final long WAIT_USE_PARK_THRESHOLD = 1500_000_000; // milli second
@@ -27,22 +26,34 @@ public class DistributedLock {
      */
     public DistributedLock(RemoteConfigure remoteConfigure) {
         this.lockPool = new ConcurrentHashMap<>();
-        this.configure = remoteConfigure;
-        synchronizer = remoteConfigure.createRemoteSynchronizer(lockPool);
+        remoteSynchronizer = remoteConfigure.createRemoteSynchronizer(lockPool);
     }
 
     /**
      * 初始化对应键名的锁
+     * @param key 锁键名
+     * @param fair 是否公平（仅本地公平）
      */
     public void initKey(String key, boolean fair) {
         Objects.requireNonNull(key);
         lockPool.putIfAbsent(key, new Sync(fair));
     }
 
+    /**
+     * 阻塞请求锁
+     * @param key 锁键名
+     * @return 返回锁
+     */
     public Lock lock(String key) {
         return lock(key, false);
     }
 
+    /**
+     * 尝试获取锁（非公平方式），不一定获取到
+     * @param key 锁键名
+     * @param waitMillis 等待毫秒数
+     * @return 返回锁或者未获取到时返回null
+     */
     public Lock tryLock(String key, long waitMillis) {
         return tryLock(key, false, waitMillis);
     }
@@ -51,6 +62,7 @@ public class DistributedLock {
      * 请求分布式锁
      * @param key 锁键名
      * @param fair 是否公平锁（仅在锁未初始化时有效）
+     * @return 返回锁
      */
     public Lock lock(String key, boolean fair) {
         initKey(key, fair);
@@ -61,7 +73,11 @@ public class DistributedLock {
     }
 
     /**
-     * 尝试在一定时间内获得分布式锁
+     * 尝试获取锁（非公平方式），不一定获取到
+     * @param key 锁键名
+     * @param fair 仅在锁初始化时指定是否公平，当前方法一定是不公平的获取
+     * @param waitMillis 等待毫秒数
+     * @return 返回锁或者未获取到时返回null
      */
     public Lock tryLock(String key, boolean fair, long waitMillis) {
         initKey(key, fair);
@@ -151,7 +167,7 @@ public class DistributedLock {
         }
 
         protected void lock() {
-            if (!fair && compareAndSetState(0, 1)) { // 非公平的会进行一次尝试
+            if (!fair && compareAndSetState(0, 1)) { // 非公平的会进行一次尝试，失败的情况下才会进入排队
                 // 切换资源状态
                 while (!changeLockState(LOCK_STATE_NO_MEAL, LOCK_STATE_WAIT_FEEDING)) {
                     LockSupport.parkNanos(WAIT_TIME_UNIT);
@@ -168,7 +184,7 @@ public class DistributedLock {
         }
 
         public void sendSignal(RemoteSynchronizer.Signal signal) {
-            synchronizer.notifySynchronize(signal);
+            remoteSynchronizer.notifySynchronize(signal);
         }
 
         protected boolean tryLock(long startNanoSeconds, long waitNanoSeconds) {
