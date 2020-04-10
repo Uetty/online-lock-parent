@@ -26,6 +26,17 @@
 
 目前仅存在一个适配单Redis服务器（非集群）的远程同步插件SimpleRemoteSynchronizer，它使用SimpleRemoteConfigure来配置。使用方法如下：
 
+引入依赖
+```
+<dependency>
+    <groupId>com.uetty.jedis</groupId>
+    <artifactId>online-lock</artifactId>
+    <version>1.0.1-Beta</version>
+</dependency>
+```
+
+代码调用
+
 ```
 SimpleRemoteConfigure configure = new SimpleRemoteConfigure();
 configure.setKeyPrefix("lockinst");
