@@ -47,7 +47,9 @@ try {
     // TODO 业务代码
     // ...
 } finally {
-    lock.unlock();
+    if (lock != null) {
+        lock.unlock();
+    }
 }
 ```
 
