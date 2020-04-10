@@ -11,7 +11,7 @@
 
     <artifactId>online-lock</artifactId>
     <name>online lock</name>
-
+    <description>distributed lock implemented by redis</description>
     <url>https://github.com/Uetty/online-lock-parent/tree/master/online-lock</url>
     <licenses>
         <license>

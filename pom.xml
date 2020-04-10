@@ -10,6 +10,7 @@
     <version>1.0.1-Beta</version>
 
     <name>online lock parent</name>
+    <description>distributed lock implemented by redis</description>
     <url>https://github.com/Uetty/online-lock-parent</url>
     <licenses>
         <license>
